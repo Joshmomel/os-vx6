@@ -4,31 +4,31 @@
 
 int main(int argc, char *argv[])
 {
-  int p[2];
-  pipe(p);
-  printf("p0 has now result: %d \n", p[0]);
-  printf("p1 has now result: %d \n", p[1]);
+  int parent_fd[2];
+  int child_fd[2];
+  pipe(parent_fd);
+  pipe(child_fd);
 
   if (fork() == 0)
   {
     char buf[10];
-    read(p[0], buf, sizeof buf);
+    read(parent_fd[0], buf, sizeof buf);
     int id = getpid();
-    printf("%d : child received %s \n", id, buf);
-    write(p[1], "pong", 4);
-    close(p[0]);
-    close(p[1]);
+    printf("%d: received %s\n", id, buf);
+    write(child_fd[1], "pong", 4);
+    close(child_fd[0]);
+    close(child_fd[1]);
   }
   else
   {
     char buf[10];
     int id = getpid();
-    write(p[1], "ping", 4);
-    close(p[1]);
+    write(parent_fd[1], "ping", 4);
+    close(parent_fd[1]);
     wait();
-    read(p[0], buf, sizeof buf);
-    printf("%d : parent received %s \n", id, buf);
-    close(p[0]);
+    read(child_fd[0], buf, sizeof buf);
+    printf("%d: received %s\n", id, buf);
+    close(child_fd[0]);
   }
 
   exit();
