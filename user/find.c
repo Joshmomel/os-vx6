@@ -60,7 +60,7 @@ void find(char *path, char *name)
   switch (st.type)
   {
   case T_FILE:
-    if (match(name, fmtname(path)))
+    if (match(path, name))
     {
       printf("%s\n", path);
     }
@@ -74,13 +74,16 @@ void find(char *path, char *name)
     }
     strcpy(buf, path);
     p = buf + strlen(buf);
+    // 给path后面添加 /
     *p++ = '/';
     while (read(fd, &de, sizeof(de)) == sizeof(de))
     {
+      // 如果读取成功, 一直都会在while loop中
       if (de.inum == 0)
         continue;
       if (strcmp(de.name, ".") == 0 || strcmp(de.name, "..") == 0)
         continue;
+      // 把 de.name 拷贝到p中
       memmove(p, de.name, DIRSIZ);
       p[DIRSIZ] = 0;
       find(buf, name);
