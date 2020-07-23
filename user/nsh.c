@@ -89,44 +89,53 @@ void redirect(int k, int pd[])
 
 void handle(struct cmd *cmd)
 {
+  // fprintf(2, "handle %d is called\n", getpid());
   if (cmd[0].input)
   {
+    // fprintf(2, "input is %s\n", cmd[0].input);
     close(0);
     open(cmd[0].input, O_RDONLY);
   }
-  if (cmd[0].input)
+  if (cmd[0].output)
   {
+    // fprintf(2, "input is %s\n", cmd[0].output);
     close(1);
     open(cmd[0].output, O_WRONLY | O_CREATE);
   }
-  if (fork())
-    exec(cmd[0].args[0], cmd[0].args);
-  wait(0);
+  // fprintf(2, "handle %d is done\n", getpid());
+  exec(cmd[0].args[0], cmd[0].args);
+  exit(0);
 }
 
 void run_cmd(struct cmd *cmd, int cmd_size)
 {
   if (cmd_size)
   {
+    // fprintf(2, "cmd size is %d\n", cmd_size);
     int pd[2];
     pipe(pd);
     // int parent_pid = getpid();
     // fprintf(2, "pid: %d\n", parent_pid);
-    if (!fork())
+    if (fork() > 0)
     {
       // fprintf(2, "%d -> %d source\n", parent_pid, getpid());
       if (cmd_size > 1)
+      {
+        // fprintf(2, "%d redirect\n", getpid());
         redirect(1, pd);
+      }
       handle(cmd);
     }
-    else if (!fork())
+    else if (fork() > 0)
     {
       // fprintf(2, "%d -> %d sink\n", parent_pid, getpid());
       if (cmd_size > 1)
       {
+        // fprintf(2, "%d redirect\n", getpid());
         redirect(0, pd);
-        cmd_size--;
+        cmd_size = cmd_size - 1;
         cmd = cmd + 1;
+        // print_cmd(cmd, cmd_size);
         run_cmd(cmd, cmd_size);
       }
     }
@@ -156,6 +165,7 @@ void print_cmd(struct cmd *cmd, int cmd_sz)
   // }
   for (int i = 0; i < cmd_sz; i++)
   {
+    printf("cmd size in the print is %d\n", cmd_sz);
     printf("cmd[%d].args", i);
     for (int j = 0; j < cmd[i].argc; j++)
       printf(" %s(%d)", cmd[i].args[j], strlen(cmd[i].args[j]));
@@ -173,12 +183,14 @@ int skip(char *token, const char *given_string)
 
 int getcmd(char *buf, int nbuf)
 {
-  fprintf(2, "@ ");
-  memset(buf, 0, nbuf);
-  gets(buf, nbuf);
+  write(1, "@ ", strlen("@ "));
+  memset(buf, 0, 1024);
+  gets(buf, 1024);
+
   if (buf[0] == 0) // EOF
-    return -1;
-  buf[strlen(buf) - 1] = 0;
+    exit(0);
+
+  *strchr(buf, '\n') = '\0';
   return 0;
 }
 
@@ -195,15 +207,12 @@ int main(int argc, char *argv[])
     {
       // Chdir must be called by the parent, not the child.
       // printf("strlen of buf is %d\n", strlen(buf));
-      buf[strlen(buf) - 1] = 0; // chop \n
       if (chdir(buf + 3) < 0)
         fprintf(2, "cannot cd %s\n", buf + 3);
       continue;
     }
     if (fork() == 0)
-    {
       run_cmd(cmd, parsecmd(cmd, buf));
-    }
     wait(0);
   }
 
