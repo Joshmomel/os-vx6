@@ -74,6 +74,7 @@ void fileclose(struct file *f)
   ff = *f;
   f->ref = 0;
   f->type = FD_NONE;
+  bd_free(f);
   release(&ftable.lock);
 
   if (ff.type == FD_PIPE)
