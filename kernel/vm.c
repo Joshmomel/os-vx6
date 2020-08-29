@@ -310,9 +310,41 @@ freewalk(pagetable_t pagetable)
   kfree((void *)pagetable);
 }
 
+void print_dot(int count)
+{
+  int i;
+  for (i = 0; i <= count; i++)
+  {
+    printf(".. ");
+  }
+}
+
+void vmprint_helper(pagetable_t pagetable, int count)
+{
+  for (int i = 0; i < 512; i++)
+  {
+    pte_t pte = pagetable[i];
+    if ((pte & PTE_V) && (pte & (PTE_R | PTE_W | PTE_X)) == 0)
+    {
+      print_dot(count);
+      printf("%d:", i);
+      printf("pte %p ", pte);
+      printf("pa %p\n", PTE2PA(pte));
+      uint64 child = PTE2PA(pte);
+      vmprint_helper((pagetable_t)child, count + 1);
+    }
+    else if (pte & PTE_V)
+    {
+      printf(".. .. .. %d:", i);
+      printf("pte %p ", pte);
+      printf("pa %p\n", PTE2PA(pte));
+    }
+  }
+}
+
 void vmprint(pagetable_t pagetable)
 {
-  printf("print the page table\n");
+  vmprint_helper(pagetable, 0);
 }
 
 // Free user memory pages,
