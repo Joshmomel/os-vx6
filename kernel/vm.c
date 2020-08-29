@@ -319,6 +319,12 @@ void print_dot(int count)
   }
 }
 
+void print_to_UI(int count, int entry_index, pte_t pte)
+{
+  print_dot(count);
+  printf("%d: pte %p pa %p\n", entry_index, pte, PTE2PA(pte));
+}
+
 void vmprint_helper(pagetable_t pagetable, int count)
 {
   for (int i = 0; i < 512; i++)
@@ -326,18 +332,13 @@ void vmprint_helper(pagetable_t pagetable, int count)
     pte_t pte = pagetable[i];
     if ((pte & PTE_V) && (pte & (PTE_R | PTE_W | PTE_X)) == 0)
     {
-      print_dot(count);
-      printf("%d:", i);
-      printf("pte %p ", pte);
-      printf("pa %p\n", PTE2PA(pte));
+      print_to_UI(count, i, pte);
       uint64 child = PTE2PA(pte);
       vmprint_helper((pagetable_t)child, count + 1);
     }
     else if (pte & PTE_V)
     {
-      printf(".. .. .. %d:", i);
-      printf("pte %p ", pte);
-      printf("pa %p\n", PTE2PA(pte));
+      print_to_UI(count, i, pte);
     }
   }
 }
