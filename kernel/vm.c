@@ -353,6 +353,7 @@ void vmprint_helper(pagetable_t pagetable, int count)
 
 void vmprint(pagetable_t pagetable)
 {
+  printf("page table %p\n", pagetable);
   vmprint_helper(pagetable, 0);
 }
 

@@ -107,8 +107,9 @@ int exec(char *path, char **argv)
       last = s + 1;
   safestrcpy(p->name, last, sizeof(p->name));
 
-  if (strncmp(p->name, "init", 4) == 0)
+  if (strncmp(p->name, "init", 4))
   {
+
     //print page table
     vmprint(p->pagetable);
   }
