@@ -313,10 +313,12 @@ freewalk(pagetable_t pagetable)
 void print_dot(int count)
 {
   int i;
-  for (i = 0; i <= count; i++)
+  printf(" ");
+  for (i = 0; i < count; i++)
   {
     printf(".. ");
   }
+  printf("..");
 }
 
 void print_to_UI(int count, int entry_index, pte_t pte)
@@ -345,6 +347,7 @@ void vmprint_helper(pagetable_t pagetable, int count)
 
 void vmprint(pagetable_t pagetable)
 {
+  printf("page table %p\n", pagetable);
   vmprint_helper(pagetable, 0);
 }
 
