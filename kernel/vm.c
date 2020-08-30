@@ -153,6 +153,7 @@ kvmpa(uint64 va)
 // physical addresses starting at pa. va and size might not
 // be page-aligned. Returns 0 on success, -1 if walk() couldn't
 // allocate a needed page-table page.
+// 把va 跟 pa map 到给定的pagetable中
 int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 {
   uint64 a, last;
@@ -164,6 +165,7 @@ int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   {
     if ((pte = walk(pagetable, a, 1)) == 0)
       return -1;
+    // 如果PTE valid 也就是已经存在这个PTE，不需要map
     if (*pte & PTE_V)
       panic("remap");
     *pte = PA2PTE(pa) | perm | PTE_V;
@@ -178,6 +180,7 @@ int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 // Remove mappings from a page table. The mappings in
 // the given range must exist. Optionally free the
 // physical memory.
+// 把va从pagetable中移除
 void uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
 {
   uint64 a, last;
@@ -189,11 +192,13 @@ void uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
   for (;;)
   {
     if ((pte = walk(pagetable, a, 0)) == 0)
-      panic("uvmunmap: walk");
+      // panic("uvmunmap: walk");
+      goto end;
     if ((*pte & PTE_V) == 0)
     {
-      printf("va=%p pte=%p\n", a, *pte);
-      panic("uvmunmap: not mapped");
+      // printf("va=%p pte=%p\n", a, *pte);
+      // panic("uvmunmap: not mapped");
+      goto end;
     }
     if (PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
@@ -203,6 +208,7 @@ void uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
       kfree((void *)pa);
     }
     *pte = 0;
+  end:
     if (a == last)
       break;
     a += PGSIZE;
@@ -231,6 +237,7 @@ void uvminit(pagetable_t pagetable, uchar *src, uint sz)
 
   if (sz >= PGSIZE)
     panic("inituvm: more than a page");
+  // 这里的mem就是pa
   mem = kalloc();
   memset(mem, 0, PGSIZE);
   mappages(pagetable, 0, PGSIZE, (uint64)mem, PTE_W | PTE_R | PTE_X | PTE_U);
@@ -288,6 +295,7 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 
 // Recursively free page-table pages.
 // All leaf mappings must already have been removed.
+// 把整个pagetable全部清除
 static void
 freewalk(pagetable_t pagetable)
 {

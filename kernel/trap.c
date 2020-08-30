@@ -68,15 +68,36 @@ void usertrap(void)
   {
     // ok
   }
+  else if (r_scause() == 13 || r_scause() == 15)
+  {
+    printf("is page fault\n");
+
+    pagetable_t pagetable = p->pagetable;
+    uint64 va = r_stval();
+    if (va > p->sz)
+    {
+      p->killed = 1;
+      goto end;
+    }
+
+    uint64 pg_va = PGROUNDDOWN(va);
+    char *mem = kalloc();
+    memset(mem, 0, PGSIZE);
+    if (mappages(pagetable, pg_va, PGSIZE, (uint64)mem, PTE_W | PTE_X | PTE_R | PTE_U) != 0)
+    {
+      kfree(mem);
+      p->killed = 1;
+      goto end;
+    }
+  }
   else
   {
-    // find va
-    vmprint(p->pagetable);
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    // printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
   }
 
+end:
   if (p->killed)
     exit(-1);
 
