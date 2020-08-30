@@ -70,8 +70,6 @@ void usertrap(void)
   }
   else if (r_scause() == 13 || r_scause() == 15)
   {
-    printf("is page fault\n");
-
     pagetable_t pagetable = p->pagetable;
     uint64 va = r_stval();
     if (va > p->sz)
