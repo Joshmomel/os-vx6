@@ -72,7 +72,8 @@ void usertrap(void)
   {
     pagetable_t pagetable = p->pagetable;
     uint64 va = r_stval();
-    if (va > p->sz)
+
+    if (va >= p->sz || va <= PGROUNDDOWN(p->tf->sp))
     {
       p->killed = 1;
       goto end;
@@ -80,6 +81,12 @@ void usertrap(void)
 
     uint64 pg_va = PGROUNDDOWN(va);
     char *mem = kalloc();
+    if (mem == 0)
+    {
+      p->killed = 1;
+      goto end;
+    }
+
     memset(mem, 0, PGSIZE);
     if (mappages(pagetable, pg_va, PGSIZE, (uint64)mem, PTE_W | PTE_X | PTE_R | PTE_U) != 0)
     {

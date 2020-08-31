@@ -43,18 +43,22 @@ sys_sbrk(void)
 {
   int addr;
   int n;
+  int newaddr;
 
   if (argint(0, &n) < 0)
     return -1;
-  addr = myproc()->sz;
-  // if(growproc(n) < 0)
-  //   return -1;
-  myproc()->sz += n;
-  if (n < 0)
-  {
-    uvmalloc(myproc()->pagetable, addr, myproc()->sz);
-  }
 
+  addr = myproc()->sz;
+  newaddr = PGROUNDUP(addr + n);
+  if (newaddr < PGSIZE || newaddr >= MAXVA)
+  {
+    exit(-1);
+  }
+  if (newaddr < addr)
+  {
+    uvmdealloc(myproc()->pagetable, addr, newaddr);
+  }
+  myproc()->sz = newaddr;
   return addr;
 }
 
