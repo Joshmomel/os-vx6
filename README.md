@@ -5,3 +5,4 @@
 - [Lab Utilities](https://github.com/Joshmomel/os-vx6/tree/util)
 - [Lab Shell](https://github.com/Joshmomel/os-vx6/tree/sh)
 - [Lab Allocator](https://github.com/Joshmomel/os-vx6/tree/alloc)
+- [Lab lazy](https://github.com/Joshmomel/os-vx6/tree/lazy)
