@@ -124,3 +124,11 @@ kalloc(void)
   }
   return (void *)r;
 }
+
+//increase reference
+void ref_inc(void *pa)
+{
+  acquire(&ref_counter.lock);
+  ++ref_counter.ref_base[ref_index(pa)];
+  release(&ref_counter.lock);
+}
