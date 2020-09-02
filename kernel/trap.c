@@ -70,8 +70,10 @@ void usertrap(void)
   }
   else if (r_scause() == 13 || r_scause() == 15)
   {
-    printf("page fault\n");
-    p->killed = 1;
+    if (r_stval() >= p->sz)
+      p->killed = 1;
+    else if (uvmcow(p->pagetable, r_stval()) != 0)
+      p->killed = 1;
   }
   else
   {
