@@ -85,12 +85,12 @@ void usertrap(void)
     if (p->max_count > 0)
     {
       if (p->is_handle_return == 0)
+        // save the trapframe
         p->alarm_tf = *(p->tf);
       if (p->count < p->max_count)
         p->count += 1;
       if (p->count == p->max_count)
       {
-        printf("else \n");
         p->is_handle_return = 1;
         p->tf->epc = p->fn;
         p->count = 1;

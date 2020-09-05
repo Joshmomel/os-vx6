@@ -105,17 +105,14 @@ int sys_sigalarm(void)
   if (argint(0, &tick) < 0 || argaddr(1, &fn) < 0)
     return -1;
   struct proc *p = myproc();
-  acquire(&p->lock);
-  int current_pid = p->pid;
-  printf("current pid is %d\n", current_pid);
-  printf("ticks are %d\n", tick);
-  printf("handle function is %p\n", fn);
 
+  acquire(&p->lock);
   p->max_count = tick;
   p->fn = fn;
+  // init the alarm trapframe
   memset(&(p->alarm_tf), 0, sizeof(struct trapframe));
-
   release(&p->lock);
+
   return 0;
 }
 
@@ -123,10 +120,8 @@ int sys_sigreturn(void)
 {
   struct proc *p = myproc();
   acquire(&p->lock);
-
   p->is_handle_return = 0;
-  printf("original tf: %p\n", p->tf);
-  printf("alarm tf: %p\n", p->alarm_tf);
+  //restore the tf from alarm trapframe
   *p->tf = p->alarm_tf;
   release(&p->lock);
   return 0;

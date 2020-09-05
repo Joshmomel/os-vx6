@@ -131,8 +131,6 @@ found:
 
   // initialize tricks
   p->count = 0;
-  p->max_count = 0;
-  p->fn = 0;
 
   return p;
 }
