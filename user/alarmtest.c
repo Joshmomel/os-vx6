@@ -19,7 +19,7 @@ void periodic();
 int main(int argc, char *argv[])
 {
   test0();
-  // test1();
+  test1();
   exit(0);
 }
 
@@ -45,7 +45,10 @@ void test0()
     if ((i % 1000000) == 0)
       write(2, ".", 1);
     if (count > 0)
+    {
+      printf("i is %d\n", i);
       break;
+    }
   }
   sigalarm(0, 0);
   if (count > 0)
@@ -87,7 +90,10 @@ void test1()
   for (i = 0; i < 500000000; i++)
   {
     if (count >= 10)
+    {
+      printf("i is %d\n", i);
       break;
+    }
     foo(i, &j);
   }
   if (count < 10)
@@ -104,6 +110,7 @@ void test1()
     // occurred; another is that that registers may not be
     // restored correctly, causing i or j or the address ofj
     // to get an incorrect value.
+    printf("j is %d\n", j);
     printf("\ntest1 failed: foo() executed fewer times than it was called\n");
     exit(1);
   }

@@ -119,4 +119,6 @@ struct proc
   int count;
   int max_count;
   uint64 fn;
+  struct trapframe alarm_tf;
+  uint64 is_handle_return;
 };
