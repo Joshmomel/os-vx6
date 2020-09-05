@@ -81,15 +81,15 @@ void usertrap(void)
   // give up the CPU if this is a timer interrupt.
   if (which_dev == 2)
   {
-    printf("timer interrupt for the count = %d\n", myproc()->count);
+    // printf("timer interrupt for the count = %d\n", myproc()->count);
     if (p->count < p->max_count)
     {
-      printf("p counter is %d\n", p->count);
+      // printf("p counter is %d\n", p->count);
       p->count += 1;
     }
     else
     {
-      printf("else \n");
+      // printf("else \n");
       p->tf->epc = 0;
     }
   }
