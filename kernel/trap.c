@@ -90,6 +90,7 @@ void usertrap(void)
     else
     {
       printf("else \n");
+      p->tf->epc = 0;
     }
   }
 
