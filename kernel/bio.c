@@ -22,33 +22,44 @@
 #include "fs.h"
 #include "buf.h"
 
+#define NBUCKETS 13
+
 struct
 {
-  struct spinlock lock;
+  struct spinlock lock[NBUCKETS];
   struct buf buf[NBUF];
 
   // Linked list of all buffers, through prev/next.
   // head.next is most recently used.
-  struct buf head;
+  struct buf hashbucket[NBUCKETS];
 } bcache;
 
 void binit(void)
 {
   struct buf *b;
+  int i;
 
-  initlock(&bcache.lock, "bcache");
+  for (i = 0; i < NBUCKETS; i++)
+  {
+    initlock(&bcache.lock[i], "bcache");
+    bcache.hashbucket[i].prev = &bcache.hashbucket[i];
+    bcache.hashbucket[i].next = &bcache.hashbucket[i];
+  }
 
-  // Create linked list of buffers
-  bcache.head.prev = &bcache.head;
-  bcache.head.next = &bcache.head;
+  i = 0;
   for (b = bcache.buf; b < bcache.buf + NBUF; b++)
   {
-    b->next = bcache.head.next;
-    b->prev = &bcache.head;
+    b->next = bcache.hashbucket[i].next;
+    b->prev = &bcache.hashbucket[i];
     initsleeplock(&b->lock, "buffer");
-    bcache.head.next->prev = b;
-    bcache.head.next = b;
+    bcache.hashbucket[i].next->prev = b;
+    bcache.hashbucket[i].next = b;
   }
+}
+
+int bhash(int blockno)
+{
+  return blockno % NBUCKETS;
 }
 
 // Look through buffer cache for block on device dev.
@@ -58,35 +69,51 @@ static struct buf *
 bget(uint dev, uint blockno)
 {
   struct buf *b;
-
-  acquire(&bcache.lock);
+  int bhashnum = bhash(blockno);
+  acquire(&bcache.lock[bhashnum]);
 
   // Is the block already cached?
-  for (b = bcache.head.next; b != &bcache.head; b = b->next)
+  for (b = bcache.hashbucket[bhashnum].next; b != &bcache.hashbucket[bhashnum]; b = b->next)
   {
     if (b->dev == dev && b->blockno == blockno)
     {
       b->refcnt++;
-      release(&bcache.lock);
+      release(&bcache.lock[bhashnum]);
       acquiresleep(&b->lock);
       return b;
     }
   }
 
-  // Not cached; recycle an unused buffer.
-  for (b = bcache.head.prev; b != &bcache.head; b = b->prev)
+  int next_hash_num = (bhashnum + 1) % NBUCKETS;
+  while (next_hash_num != bhashnum)
   {
-    if (b->refcnt == 0)
+    acquire(&bcache.lock[next_hash_num]);
+    for (b = bcache.hashbucket[next_hash_num].next; b != &bcache.hashbucket[next_hash_num]; b = b->next)
     {
-      b->dev = dev;
-      b->blockno = blockno;
-      b->valid = 0;
-      b->refcnt = 1;
-      release(&bcache.lock);
-      acquiresleep(&b->lock);
-      return b;
+      if (b->refcnt == 0)
+      {
+        b->dev = dev;
+        b->blockno = blockno;
+        b->valid = 0;
+        b->refcnt = 1;
+
+        b->next->prev = b->prev;
+        b->prev->next = b->next;
+        release(&bcache.lock[next_hash_num]);
+
+        b->next = bcache.hashbucket[bhashnum].next;
+        b->prev = &bcache.hashbucket[bhashnum];
+        bcache.hashbucket[bhashnum].next->prev = b;
+        bcache.hashbucket[bhashnum].next = b;
+        release(&bcache.lock[bhashnum]);
+        acquiresleep(&b->lock);
+        return b;
+      }
     }
+    release(&bcache.lock[next_hash_num]);
+    next_hash_num = (next_hash_num + 1) % NBUCKETS;
   }
+
   panic("bget: no buffers");
 }
 
@@ -121,33 +148,35 @@ void brelse(struct buf *b)
     panic("brelse");
 
   releasesleep(&b->lock);
-
-  acquire(&bcache.lock);
+  int bhashnum = bhash(b->blockno);
+  acquire(&bcache.lock[bhashnum]);
   b->refcnt--;
   if (b->refcnt == 0)
   {
     // no one is waiting for it.
     b->next->prev = b->prev;
     b->prev->next = b->next;
-    b->next = bcache.head.next;
-    b->prev = &bcache.head;
-    bcache.head.next->prev = b;
-    bcache.head.next = b;
+    b->next = bcache.hashbucket[bhashnum].next;
+    b->prev = &bcache.hashbucket[bhashnum];
+    bcache.hashbucket[bhashnum].next->prev = b;
+    bcache.hashbucket[bhashnum].next = b;
   }
 
-  release(&bcache.lock);
+  release(&bcache.lock[bhashnum]);
 }
 
 void bpin(struct buf *b)
 {
-  acquire(&bcache.lock);
+  int bhashnum = bhash(b->blockno);
+  acquire(&bcache.lock[bhashnum]);
   b->refcnt++;
-  release(&bcache.lock);
+  release(&bcache.lock[bhashnum]);
 }
 
 void bunpin(struct buf *b)
 {
-  acquire(&bcache.lock);
+  int bhashnum = bhash(b->blockno);
+  acquire(&bcache.lock[bhashnum]);
   b->refcnt--;
-  release(&bcache.lock);
+  release(&bcache.lock[bhashnum]);
 }
