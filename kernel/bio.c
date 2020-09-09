@@ -88,7 +88,7 @@ bget(uint dev, uint blockno)
   while (next_hash_num != bhashnum)
   {
     acquire(&bcache.lock[next_hash_num]);
-    for (b = bcache.hashbucket[next_hash_num].next; b != &bcache.hashbucket[next_hash_num]; b = b->next)
+    for (b = bcache.hashbucket[next_hash_num].prev; b != &bcache.hashbucket[next_hash_num]; b = b->prev)
     {
       if (b->refcnt == 0)
       {
