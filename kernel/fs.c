@@ -480,7 +480,6 @@ itrunc(struct inode *ip)
 
   if (ip->addrs[NDIRECT + 1])
   {
-    printf("free start 3\n");
     bp = bread(ip->dev, ip->addrs[NDIRECT + 1]);
     a = (uint *)bp->data;
     for (i = 0; i < NINDIRECT; i++)
