@@ -331,6 +331,30 @@ sys_open(void)
       end_op(ROOTDEV);
       return -1;
     }
+    if (ip->type == T_SYMLINK && (omode & O_NOFOLLOW) == 0)
+    {
+      struct inode *ifollow;
+      int i;
+      for (i = 0;; i++)
+      {
+        if ((ifollow = namei(ip->target)) == 0)
+        {
+          iunlockput(ip);
+          end_op(ROOTDEV);
+          return -1;
+        }
+        iunlockput(ip);
+        ilock(ifollow);
+        ip = ifollow;
+        if (ip->is_target != 1)
+          break;
+        if (i > 10)
+        {
+          end_op(ROOTDEV);
+          return -1;
+        }
+      }
+    }
   }
 
   if (ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV))
@@ -519,5 +543,25 @@ sys_pipe(void)
 
 uint64 sys_symlink(void)
 {
+  struct inode *ip;
+  char target[MAXPATH], path[MAXPATH];
+  if (argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
+    return -1;
+
+  begin_op(ROOTDEV);
+  ip = create(path, T_SYMLINK, 0, 0);
+  if (ip == 0)
+  {
+    end_op(ROOTDEV);
+    return -1;
+  }
+  ip->is_target = 1;
+  int length = strlen(target) > MAXPATH ? strlen(target) : MAXPATH;
+  memset(ip->target, 0, MAXPATH);
+  memmove(ip->target, target, length);
+  iunlockput(ip);
+
+  end_op(ROOTDEV);
+
   return 0;
 }

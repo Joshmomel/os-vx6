@@ -36,6 +36,8 @@ struct inode
   short nlink;
   uint size;
   uint addrs[NDIRECT + 2];
+  char target[128];
+  uint is_target;
 };
 
 // map major device number to device functions.
