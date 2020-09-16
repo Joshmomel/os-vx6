@@ -475,6 +475,14 @@ int copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 uint64 sys_mmap(void)
 {
   printf("sys mmap is called\n");
+  //mmap(0, PGSIZE*2, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+  int addr, length, prot, flags, fd, offset;
+  if (argint(0, &addr) < 0 || argint(1, &length) < 0 || argint(2, &prot) < 0 || argint(3, &flags) < 0 || argint(4, &fd) < 0 || argint(5, &offset) < 0)
+    return -1;
+  printf("addr %d, length %d, prot %d, flags %d, fd %d, offset %d\n", addr, length, prot, flags, fd, offset);
+
+  struct proc *p = myproc();
+  printf("proc in mmap is %p\n", p->ofile[fd]);
 
   return -1;
 }
