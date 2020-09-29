@@ -92,19 +92,18 @@ enum procstate
   ZOMBIE
 };
 
+//mmap(0, PGSIZE*2, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+//int addr, length, prot, flags, fd, offset;
 struct vma
 {
   uint64 end;
   uint64 start;
+  int length;
+  int prot;
+  int offset;
   int flags;
-  int ops;
-  struct inode *ip;
-  struct vma *next;
-};
-
-struct mmaplist
-{
-  struct vma *vmalist;
+  int used;
+  struct file *f;
 };
 
 // Per-process state
@@ -129,5 +128,7 @@ struct proc
   struct file *ofile[NOFILE]; // Open files
   struct inode *cwd;          // Current directory
   char name[16];              // Process name (debugging)
-  struct mmaplist mmap;
+
+  //for mmap
+  struct vma vmas[MMAP_NUM];
 };

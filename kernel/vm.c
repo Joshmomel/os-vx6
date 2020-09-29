@@ -197,7 +197,6 @@ void uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
       panic("uvmunmap: walk");
     if ((*pte & PTE_V) == 0)
     {
-      printf("va=%p pte=%p\n", a, *pte);
       panic("uvmunmap: not mapped");
     }
     if (PTE_FLAGS(*pte) == PTE_V)
@@ -472,23 +471,130 @@ int copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
+struct vma *vma_alloc()
+{
+  struct proc *p = myproc();
+  for (int i = 0; i < MMAP_NUM; i++)
+  {
+    if (p->vmas[i].used == 0)
+    {
+      p->vmas[i]
+          .start = MMAP_VASTART + i * MMAP_SIZE;
+      return &p->vmas[i];
+    }
+  }
+  return 0;
+}
 uint64 sys_mmap(void)
 {
-  printf("sys mmap is called\n");
-  //mmap(0, PGSIZE*2, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
   int addr, length, prot, flags, fd, offset;
   if (argint(0, &addr) < 0 || argint(1, &length) < 0 || argint(2, &prot) < 0 || argint(3, &flags) < 0 || argint(4, &fd) < 0 || argint(5, &offset) < 0)
     return -1;
-  printf("addr %d, length %d, prot %d, flags %d, fd %d, offset %d\n", addr, length, prot, flags, fd, offset);
 
   struct proc *p = myproc();
-  printf("proc in mmap is %p\n", p->ofile[fd]);
 
-  return -1;
+  struct file *f = p->ofile[fd];
+  struct vma *vma;
+
+  if ((flags & MAP_SHARED) && (prot & PROT_WRITE) && !f->writable)
+    return -1;
+
+  if ((vma = vma_alloc()) == 0)
+    return -1;
+  vma->end = PGROUNDUP(vma->start + length);
+  vma->length = length;
+  vma->prot = prot;
+  vma->flags = flags;
+  vma->f = f;
+  vma->offset = offset;
+  vma->used = 1;
+
+  filedup(vma->f);
+  return vma->start;
 }
 
 uint64 sys_munmap(void)
 {
-  printf("sys munmap is called\n");
-  return -1;
+  struct proc *p = myproc();
+  uint64 addr;
+  int length;
+
+  if (argaddr(0, &addr) < 0 || argint(1, &length) < 0)
+    return -1;
+
+  if (addr < MMAP_VASTART || addr > MMAP_VEND)
+    return -1;
+
+  uint64 vpage_base = PGROUNDDOWN(addr);
+  int vma_num = (vpage_base - MMAP_VASTART) / MMAP_SIZE;
+  struct vma *map = &p->vmas[vma_num];
+
+  if (map->used == 0)
+    return -1;
+
+  static pte_t *pte;
+  uint64 pa;
+  for (uint64 va = vpage_base; va < addr + length; va += PGSIZE)
+  {
+    if ((pte = walk(p->pagetable, va, 0)) && (*pte & PTE_V))
+    {
+      pa = PTE2PA(*pte);
+      if ((map->flags & MAP_SHARED))
+      { // dirty page
+        uint64 file_start = va - vpage_base;
+        uint64 write_length = PGSIZE;
+        if (write_length > map->length - file_start)
+          write_length = map->length - file_start;
+        struct file *f = map->f;
+
+        begin_op(f->ip->dev);
+        ilock(f->ip);
+        writei(f->ip, 0, pa, file_start, write_length);
+        iunlock(f->ip);
+        end_op(f->ip->dev);
+      }
+      uvmunmap(p->pagetable, va, PGSIZE, 1);
+    }
+  }
+
+  if (map->start == addr && map->length == length)
+  {
+    fileclose(map->f);
+    map->used = 0;
+  }
+  else
+  {
+    if (map->start == addr)
+      map->start = addr + length;
+    if (map->end == addr + length)
+      map->end = addr;
+  }
+
+  return 0;
+}
+
+void mmap_dup(pagetable_t pagetable, struct vma *m)
+{
+  static pte_t *pte;
+  uint64 pa;
+  for (uint64 va = m->start; va < m->end; va += PGSIZE)
+  {
+    if ((pte = walk(pagetable, va, 0)) && (*pte & PTE_V))
+    {
+      pa = PTE2PA(*pte);
+      ref_inc((void *)pa);
+    }
+  }
+}
+
+void mmap_dedup(pagetable_t pagetable, struct vma *m)
+{
+  static pte_t *pte;
+  for (uint64 va = m->start; va < m->end; va += PGSIZE)
+  {
+    if ((pte = walk(pagetable, va, 0)) && (*pte & PTE_V))
+    {
+      uvmunmap(pagetable, va, PGSIZE, 1);
+    }
+  }
 }

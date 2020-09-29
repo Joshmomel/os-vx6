@@ -400,5 +400,11 @@ sfence_vma()
 // that have the high bit set.
 #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
 
+// for mmap
+#define MMAP_VASTART (1L << 37)
+#define MMAP_SIZE (1L << 20)
+#define MMAP_NUM 32
+#define MMAP_VEND (MMAP_VASTART + MMAP_NUM * MMAP_SIZE)
+
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t; // 512 PTEs
