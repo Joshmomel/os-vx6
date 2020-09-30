@@ -103,19 +103,65 @@ int e1000_transmit(struct mbuf *m)
   // a pointer so that it can be freed after sending.
   //
   printf("e100 transmit called\n");
-  return -1;
+  acquire(&e1000_lock);
+
+  //first get the current ring position, using E1000_TDT
+  uint32 desc_pos = regs[E1000_TDT];
+
+  // overflow detection
+  if ((tx_ring[desc_pos].status & E1000_RXD_STAT_DD) == 0)
+  {
+    release(&e1000_lock);
+    return -1;
+  }
+
+  //use mbuffree() to free the last mbuf that was transmitted with the current descriptor (if there was one).
+  if (tx_mbufs[desc_pos] != 0)
+    mbuffree(tx_mbufs[desc_pos]);
+
+  //Set the necessary cmd flags (read the E1000 manual) and stash away a pointer to the new mbuf for later freeing
+  tx_mbufs[desc_pos] = m;
+  tx_ring[desc_pos].addr = (uint64)m->head;
+  tx_ring[desc_pos].length = m->len;
+  tx_ring[desc_pos].cmd = E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP;
+  //update the ring position by adding one to E1000_TDT modulo TX_RING_SIZE
+  regs[E1000_TDT] = (desc_pos + 1) % TX_RING_SIZE;
+
+  release(&e1000_lock);
+
+  return 0;
 }
 
 static void
 e1000_recv(void)
 {
-  printf("e100 recv called\n");
-  //
-  // Your code here.
-  //
-  // Check for packets that have arrived from the e1000
-  // Create and deliver an mbuf for each packet (using net_rx()).
-  //
+  struct mbuf *buf;
+  uint32 desc_pos = (regs[E1000_RDT] + 1) % RX_RING_SIZE;
+  printf("e100 recv called and regs is %p\n", regs[E1000_RDT]);
+  // printf("desc_pos is %p\n", desc_pos);
+
+  while ((rx_ring[desc_pos].status & E1000_RXD_STAT_DD))
+  {
+    acquire(&e1000_lock);
+    buf = rx_mbufs[desc_pos];
+    //update the mbuf's length to the length reported in the descriptor
+    mbufput(buf, rx_ring[desc_pos].length);
+    //Deliver the mbuf to the protocol layer using net_rx().
+
+    rx_mbufs[desc_pos] = mbufalloc(0);
+    if (!rx_mbufs[desc_pos])
+      panic("e1000");
+    //program its head pointer into the descriptor.
+    rx_ring[desc_pos].addr = (uint64)rx_mbufs[desc_pos]->head;
+    rx_ring[desc_pos].status = 0;
+    regs[E1000_RDT] = desc_pos;
+    release(&e1000_lock);
+
+    //allocate a new mbuf (because net_rx() maybe hanging on to the mbuf passed to it)
+    net_rx(buf);
+    //update the E1000_RDT register to the next position by writing to it.
+    desc_pos = (regs[E1000_RDT] + 1) % RX_RING_SIZE;
+  }
 }
 
 void e1000_intr(void)
