@@ -102,7 +102,7 @@ int e1000_transmit(struct mbuf *m)
   // the TX descriptor ring so that the e1000 sends it. Stash
   // a pointer so that it can be freed after sending.
   //
-  printf("e100 transmit called\n");
+  // printf("e100 transmit called with buf %s\n", m->buf);
   acquire(&e1000_lock);
 
   //first get the current ring position, using E1000_TDT
@@ -126,7 +126,6 @@ int e1000_transmit(struct mbuf *m)
   tx_ring[desc_pos].cmd = E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP;
   //update the ring position by adding one to E1000_TDT modulo TX_RING_SIZE
   regs[E1000_TDT] = (desc_pos + 1) % TX_RING_SIZE;
-
   release(&e1000_lock);
 
   return 0;
@@ -137,7 +136,7 @@ e1000_recv(void)
 {
   struct mbuf *buf;
   uint32 desc_pos = (regs[E1000_RDT] + 1) % RX_RING_SIZE;
-  printf("e100 recv called and regs is %p\n", regs[E1000_RDT]);
+  // printf("e100 recv called and regs is %p\n", regs[E1000_RDT]);
   // printf("desc_pos is %p\n", desc_pos);
 
   while ((rx_ring[desc_pos].status & E1000_RXD_STAT_DD))

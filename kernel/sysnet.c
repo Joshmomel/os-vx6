@@ -88,14 +88,77 @@ bad:
 // and writing for network sockets.
 //
 
-void sockclose(struct sock *sock) {}
+void sockclose(struct sock *sock)
+{
+  // printf("##sock close\n");
+  acquire(&sock->lock);
+  wakeup(&sock->rxq);
+  release(&sock->lock);
+
+  acquire(&lock);
+  struct sock *sop = sockets;
+  if (sop->next == 0)
+  {
+    sockets = 0;
+    // printf("sop next == 0\n");
+  }
+  while (sop && sop->next)
+  {
+    if (sop->next->raddr == sock->raddr &&
+        sop->next->lport == sock->lport &&
+        sop->next->rport == sock->rport)
+    {
+      sop->next = sock->next;
+      break;
+    }
+    sop = sop->next;
+  }
+  release(&lock);
+
+  kfree((char *)sock);
+}
+
 int sockwrite(struct sock *sock, uint64 addr, int n)
 {
-  return 0;
+  // printf("##sock write\n");
+  struct mbuf *buf = mbufalloc(sizeof(struct eth) + sizeof(struct ip) + sizeof(struct udp));
+  mbufput(buf, n);
+
+  pagetable_t pagetable = myproc()->pagetable;
+  if (copyin(pagetable, buf->head, addr, n) == -1)
+  {
+    mbuffree(buf);
+    return -1;
+  }
+  // printf("buf pointer in write is: %s\n", buf->head);
+  net_tx_udp(buf, sock->raddr, sock->lport, sock->rport);
+
+  return n;
 }
+
 int sockread(struct sock *sock, uint64 addr, int n)
 {
-  return 0;
+  // printf("##socket read\n");
+  acquire(&sock->lock);
+  if (mbufq_empty(&sock->rxq))
+  {
+    while (mbufq_empty(&sock->rxq))
+      sleep(&sock->rxq, &sock->lock);
+  }
+
+  struct mbuf *buf = mbufq_pophead(&sock->rxq);
+  int len = n < buf->len ? n : buf->len;
+  pagetable_t pagetable = myproc()->pagetable;
+  if (copyout(pagetable, addr, buf->head, len) == -1)
+  {
+    release(&sock->lock);
+    mbuffree(buf);
+    return -1;
+  }
+  // printf("buf pointer in read is %s\n", buf->head);
+  release(&sock->lock);
+  mbuffree(buf);
+  return len;
 }
 
 // called by protocol handler layer to deliver UDP packets
@@ -108,5 +171,28 @@ void sockrecvudp(struct mbuf *m, uint32 raddr, uint16 lport, uint16 rport)
   // any sleeping reader. Free the mbuf if there are no sockets
   // registered to handle it.
   //
-  mbuffree(m);
+  // printf("##sockrecvudp called %s\n", m->head);
+  struct sock *so = sockets;
+  acquire(&lock);
+  while (so)
+  {
+    if (so->raddr == raddr &&
+        so->lport == lport &&
+        so->rport == rport)
+    {
+      break;
+    }
+    so = so->next;
+  }
+  release(&lock);
+  if (so == 0)
+  {
+    mbuffree(m);
+    return;
+  }
+
+  acquire(&so->lock);
+  mbufq_pushtail(&so->rxq, m);
+  release(&so->lock);
+  wakeup(&so->rxq);
 }
