@@ -2,8 +2,6 @@
 
 👍👍👍
 
-> Lab is hard but it is worth to spend time to finish it 
-
 ## link to lab
 
 - [Lab Utilities](https://github.com/Joshmomel/os-vx6/tree/util)
